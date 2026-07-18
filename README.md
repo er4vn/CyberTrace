@@ -258,6 +258,6 @@ This project is licensed under the **MIT License**.
 
 **ER4VN**
 
-Cyber Security Researcher
+Telegram: @er4vnn
 
 GitHub: https://github.com/er4vn
