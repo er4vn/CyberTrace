@@ -2,7 +2,7 @@
 
 <img width="1983" height="793" alt="CyberTrace-er4vn" src="https://github.com/user-attachments/assets/65a1e056-6fa1-46c0-bcaa-054c95f3f52e" />
 
-# CYBER TRACE
+# CYBER TRACE + ONLINE CAMERA
 
 ### Advanced OSINT & Cyber Intelligence Platform
 
