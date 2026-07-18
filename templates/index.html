@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CYBER TRACE // IP-ISP MAP</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+  :root{
+    --black:#070707; --panel:#0d0d0d; --white:#e8e8e8;
+    --dim:#6b6b6b; --red:#8a1414; --red-bright:#c41e1e;
+    --red-glow:#ff2a2a; --border:#1e1e1e;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  html,body{height:100%;background:var(--black);color:var(--white);font-family:'Courier New',monospace;overflow:hidden;}
+  #app{display:flex;height:100vh;width:100vw;}
+
+  #sidebar{
+    width:380px;min-width:380px;background:var(--panel);
+    border-right:1px solid var(--border);display:flex;flex-direction:column;
+    z-index:20;box-shadow:4px 0 30px rgba(0,0,0,0.6);overflow:hidden;
+  }
+  #brand{
+    padding:20px 20px 14px;font-size:18px;letter-spacing:4px;
+    color:var(--red-glow);text-shadow:0 0 10px var(--red-bright);
+    border-bottom:1px solid var(--border);flex-shrink:0;
+  }
+  #brand span{color:var(--dim);font-size:10px;letter-spacing:2px;display:block;margin-top:4px;text-shadow:none;}
+
+  #tabs{display:flex;border-bottom:1px solid var(--border);flex-shrink:0;}
+  .tab{
+    flex:1;padding:10px 6px;text-align:center;font-size:10px;letter-spacing:2px;
+    color:var(--dim);cursor:pointer;border-right:1px solid var(--border);transition:all .2s;
+  }
+  .tab:last-child{border-right:none;}
+  .tab:hover{color:var(--white);background:rgba(255,255,255,0.03);}
+  .tab.active{color:var(--red-glow);border-bottom:2px solid var(--red-glow);background:rgba(196,30,30,0.06);}
+
+  .tab-panel{display:none;flex:1;flex-direction:column;overflow:hidden;}
+  .tab-panel.active{display:flex;}
+
+  /* IP tab */
+  #panel-ip{padding:16px;overflow-y:auto;gap:10px;}
+  #searchBox{display:flex;gap:8px;}
+  input,select{
+    background:#111;border:1px solid #2a2a2a;color:var(--white);
+    font-family:'Courier New',monospace;outline:none;transition:border-color .25s;
+  }
+  input:focus,select:focus{border-color:var(--red-bright);box-shadow:0 0 10px rgba(196,30,30,0.3);}
+  #ipInput{flex:1;padding:10px 12px;font-size:13px;letter-spacing:1px;}
+  #ipInput::placeholder{color:var(--dim);}
+
+  .btn-red{
+    background:linear-gradient(180deg,var(--red-bright),#5a0d0d);
+    border:1px solid var(--red-glow);color:var(--white);
+    padding:10px 14px;font-family:'Courier New',monospace;
+    font-size:11px;letter-spacing:2px;cursor:pointer;transition:all .2s;
+  }
+  .btn-red:hover{box-shadow:0 0 16px var(--red-glow);transform:translateY(-1px);}
+  .btn-dim{
+    background:transparent;border:1px solid #2a2a2a;color:var(--dim);
+    padding:8px 12px;font-family:'Courier New',monospace;
+    font-size:11px;letter-spacing:2px;cursor:pointer;transition:all .2s;width:100%;
+  }
+  .btn-dim:hover{color:var(--red-glow);border-color:var(--red-bright);}
+
+  .st{font-size:11px;letter-spacing:1px;color:var(--dim);min-height:16px;}
+  .st.err{color:var(--red-glow);} .st.ok{color:#4caf50;}
+
+  .field{margin-bottom:12px;}
+  .field label{display:block;font-size:10px;letter-spacing:2px;color:var(--dim);margin-bottom:3px;}
+  .field .val{font-size:13px;color:var(--white);word-break:break-word;}
+  .field.hi .val{color:var(--red-glow);text-shadow:0 0 8px var(--red-bright);}
+  #infoPanel{border-top:1px solid var(--border);padding-top:14px;}
+  #osintPanel{border-top:1px solid var(--border);padding-top:14px;margin-top:4px;}
+  #osintPanel h4{font-size:10px;letter-spacing:2px;color:var(--dim);margin-bottom:8px;}
+  #history{border-top:1px solid var(--border);padding-top:12px;margin-top:4px;}
+  #history h4{font-size:10px;letter-spacing:2px;color:var(--dim);margin-bottom:8px;}
+  .hist-item{
+    font-size:11px;color:var(--dim);padding:6px 8px;
+    border-left:2px solid #2a2a2a;margin-bottom:5px;cursor:pointer;transition:all .2s;
+  }
+  .hist-item:hover{color:var(--white);border-left-color:var(--red-bright);background:rgba(196,30,30,0.06);}
+
+  /* CAM tab */
+  #cam-top{padding:14px;flex-shrink:0;border-bottom:1px solid var(--border);display:flex;flex-direction:column;gap:8px;}
+  #countrySelect,#pageSelect{width:100%;padding:9px 10px;font-size:12px;letter-spacing:1px;}
+  #countrySelect option,#pageSelect option{background:#111;}
+  #cam-status{font-size:11px;letter-spacing:1px;color:var(--dim);min-height:16px;}
+  #cam-status.err{color:var(--red-glow);} #cam-status.ok{color:#4caf50;}
+
+  #cam-list{flex:1;overflow-y:auto;padding:10px;}
+  .cam-card{
+    border:1px solid var(--border);border-left:2px solid #2a2a2a;
+    padding:10px 12px;margin-bottom:8px;cursor:pointer;transition:all .2s;
+  }
+  .cam-card:hover{border-left-color:var(--red-glow);background:rgba(196,30,30,0.05);}
+  .cam-card.active-card{border-left-color:var(--red-glow);background:rgba(196,30,30,0.08);}
+  .cam-ip{font-size:13px;color:var(--red-glow);margin-bottom:4px;}
+  .cam-isp{font-size:11px;color:var(--white);margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .cam-loc{font-size:10px;color:var(--dim);}
+  .cam-link{
+    display:inline-block;margin-top:6px;font-size:10px;letter-spacing:1px;
+    color:var(--red-glow);border:1px solid var(--red-bright);
+    padding:3px 8px;text-decoration:none;transition:all .2s;
+  }
+  .cam-link:hover{background:rgba(196,30,30,0.15);}
+
+  /* Map */
+  #mapWrap{flex:1;position:relative;}
+  #map{height:100%;width:100%;filter:saturate(0.4) brightness(0.75) contrast(1.1);}
+  #scanlines{
+    position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:500;mix-blend-mode:overlay;
+    background:repeating-linear-gradient(0deg,rgba(0,0,0,0.12) 0px,rgba(0,0,0,0.12) 1px,transparent 1px,transparent 3px);
+  }
+  #vignette{
+    position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:501;
+    box-shadow:inset 0 0 200px 60px rgba(0,0,0,0.85);
+  }
+  .leaflet-popup-content-wrapper{
+    background:#0d0d0d;color:var(--white);border:1px solid var(--red-bright);
+    border-radius:0;font-family:'Courier New',monospace;box-shadow:0 0 20px rgba(196,30,30,0.4);
+  }
+  .leaflet-popup-tip{background:#0d0d0d;}
+  .leaflet-popup-content{font-size:12px;line-height:1.6;}
+  .leaflet-popup-content b{color:var(--red-glow);}
+  .leaflet-popup-content a{color:var(--red-glow);}
+  .leaflet-control-zoom a{background:#0d0d0d!important;color:var(--red-glow)!important;border:1px solid #2a2a2a!important;}
+  .leaflet-control-attribution{background:rgba(0,0,0,0.6)!important;color:var(--dim)!important;}
+  .leaflet-control-attribution a{color:var(--dim)!important;}
+  ::-webkit-scrollbar{width:5px;}
+  ::-webkit-scrollbar-track{background:#0d0d0d;}
+  ::-webkit-scrollbar-thumb{background:var(--red);}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="sidebar">
+    <div id="brand">CYBER TRACE | ER4VN<span>IP / ISP / CAMERA GEOLOCATION</span></div>
+
+    <div id="tabs">
+      <div class="tab active" data-tab="ip">IP LOOKUP</div>
+      <div class="tab" data-tab="cam">CAM SCAN</div>
+    </div>
+
+    <!-- IP LOOKUP -->
+    <div class="tab-panel active" id="panel-ip">
+      <div id="searchBox">
+        <input type="text" id="ipInput" placeholder="ENTER IP OR DOMAIN..." />
+        <button class="btn-red" id="traceBtn">TRACE</button>
+      </div>
+      <button class="btn-dim" id="myIpBtn">▸ LOCATE MY OWN IP</button>
+      <div class="st" id="ip-status"></div>
+      <div id="infoPanel">
+        <div class="field hi"><label>IP ADDRESS</label><div class="val" id="f-ip">—</div></div>
+        <div class="field hi"><label>ISP / PROVIDER</label><div class="val" id="f-isp">—</div></div>
+        <div class="field"><label>ORGANIZATION</label><div class="val" id="f-org">—</div></div>
+        <div class="field"><label>AS NUMBER</label><div class="val" id="f-as">—</div></div>
+        <div class="field"><label>CITY / REGION</label><div class="val" id="f-city">—</div></div>
+        <div class="field"><label>COUNTRY</label><div class="val" id="f-country">—</div></div>
+        <div class="field"><label>TIMEZONE</label><div class="val" id="f-tz">—</div></div>
+        <div class="field"><label>COORDINATES</label><div class="val" id="f-coords">—</div></div>
+      </div>
+
+      <div id="osintPanel">
+        <h4>OSINT · WHOIS / RDAP / ASN</h4>
+        <div class="st" id="osint-status"></div>
+        <div class="field"><label>REVERSE DNS (PTR)</label><div class="val" id="o-rdns">—</div></div>
+        <div class="field hi"><label>ASN</label><div class="val" id="o-asn">—</div></div>
+        <div class="field"><label>ASN DESCRIPTION</label><div class="val" id="o-asndesc">—</div></div>
+        <div class="field"><label>ASN REGISTRY</label><div class="val" id="o-asnreg">—</div></div>
+        <div class="field"><label>NETWORK NAME</label><div class="val" id="o-netname">—</div></div>
+        <div class="field"><label>NETWORK RANGE (CIDR)</label><div class="val" id="o-netrange">—</div></div>
+        <div class="field"><label>NETWORK TYPE</label><div class="val" id="o-nettype">—</div></div>
+        <div class="field"><label>ABUSE / CONTACT EMAILS</label><div class="val" id="o-contacts">—</div></div>
+      </div>
+
+      <div id="history">
+        <h4>RECENT TRACES</h4>
+        <div id="histList"></div>
+      </div>
+    </div>
+
+    <!-- CAM SCAN -->
+    <div class="tab-panel" id="panel-cam">
+      <div id="cam-top">
+        <select id="countrySelect"><option value="">— LOADING COUNTRIES —</option></select>
+        <select id="pageSelect">
+          <option value="1">SCAN 1 PAGE  (~8 cameras)</option>
+          <option value="3" selected>SCAN 3 PAGES (~24 cameras)</option>
+          <option value="5">SCAN 5 PAGES (~40 cameras)</option>
+          <option value="10">SCAN 10 PAGES (~80 cameras)</option>
+          <option value="999">SCAN ALL PAGES (max cameras)</option>
+        </select>
+        <button class="btn-red" id="scanBtn">▸ SCAN SELECTED COUNTRY</button>
+        <button class="btn-dim" id="scanAllBtn">▸ SCAN ALL COUNTRIES (GLOBAL)</button>
+        <div id="cam-status"></div>
+      </div>
+      <div id="cam-list">
+        <div style="color:var(--dim);font-size:11px;padding:10px;">Select a country and press SCAN.</div>
+      </div>
+    </div>
+  </div>
+
+  <div id="mapWrap">
+    <div id="map"></div>
+    <div id="scanlines"></div>
+    <div id="vignette"></div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+// ── Map ───────────────────────────────────────────────────────────────────────
+const map = L.map('map',{zoomControl:true}).setView([20,0],2.3);
+L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{
+  attribution:'&copy; OpenStreetMap &copy; CARTO',subdomains:'abcd',maxZoom:19
+}).addTo(map);
+
+function makeIcon(){
+  return L.divIcon({
+    className:'',
+    html:'<div style="width:12px;height:12px;border-radius:50%;background:#ff2a2a;box-shadow:0 0 6px #ff2a2a,0 0 16px #c41e1e;border:2px solid #fff;"></div>',
+    iconSize:[12,12],iconAnchor:[6,6]
+  });
+}
+let camMarkers=[];
+function clearCamMarkers(){ camMarkers.forEach(m=>map.removeLayer(m)); camMarkers=[]; }
+
+// ── Tabs ──────────────────────────────────────────────────────────────────────
+document.querySelectorAll('.tab').forEach(t=>{
+  t.addEventListener('click',()=>{
+    document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(x=>x.classList.remove('active'));
+    t.classList.add('active');
+    document.getElementById('panel-'+t.dataset.tab).classList.add('active');
+  });
+});
+
+// ── IP LOOKUP ─────────────────────────────────────────────────────────────────
+let ipHistory=[];
+function setIPSt(msg,type){const e=document.getElementById('ip-status');e.textContent=msg;e.className='st '+(type||'');}
+function fillInfo(d){
+  document.getElementById('f-ip').textContent=d.query||'—';
+  document.getElementById('f-isp').textContent=d.isp||'—';
+  document.getElementById('f-org').textContent=d.org||'—';
+  document.getElementById('f-as').textContent=d.as||'—';
+  document.getElementById('f-city').textContent=(d.city||'—')+(d.regionName?', '+d.regionName:'');
+  document.getElementById('f-country').textContent=d.country||'—';
+  document.getElementById('f-tz').textContent=d.timezone||'—';
+  document.getElementById('f-coords').textContent=(d.lat!=null?d.lat.toFixed(4):'—')+', '+(d.lon!=null?d.lon.toFixed(4):'—');
+}
+function addHistory(d){
+  ipHistory.unshift(d);ipHistory=ipHistory.slice(0,8);
+  const list=document.getElementById('histList');list.innerHTML='';
+  ipHistory.forEach(item=>{
+    const div=document.createElement('div');div.className='hist-item';
+    div.textContent=item.query+'  ·  '+(item.isp||item.country||'');
+    div.onclick=()=>plotIP(item,true);list.appendChild(div);
+  });
+}
+function plotIP(d,skip){
+  fillInfo(d);if(!skip)addHistory(d);
+  if(d.lat==null||d.lon==null)return;
+  const m=L.marker([d.lat,d.lon],{icon:makeIcon()}).addTo(map);
+  m.bindPopup('<b>'+d.query+'</b><br/>'+(d.isp||'')+'<br/>'+(d.city||'')+(d.city?', ':'')+(d.country||''));
+  m.openPopup();map.flyTo([d.lat,d.lon],6,{duration:1.4});
+}
+function setOsintSt(msg,type){const e=document.getElementById('osint-status');e.textContent=msg;e.className='st '+(type||'');}
+function fillOsint(o){
+  document.getElementById('o-rdns').textContent=o.reverse_dns||'—';
+  document.getElementById('o-asn').textContent=o.asn?('AS'+o.asn):'—';
+  document.getElementById('o-asndesc').textContent=o.asn_description||'—';
+  document.getElementById('o-asnreg').textContent=(o.asn_registry||'—').toString().toUpperCase();
+  document.getElementById('o-netname').textContent=o.network_name||'—';
+  document.getElementById('o-netrange').textContent=o.network_range||'—';
+  document.getElementById('o-nettype').textContent=o.network_type||'—';
+  const emails=(o.contacts||[]).flatMap(c=>c.email||[]);
+  document.getElementById('o-contacts').textContent=emails.length?[...new Set(emails)].join(', '):'—';
+}
+function clearOsint(){
+  ['o-rdns','o-asn','o-asndesc','o-asnreg','o-netname','o-netrange','o-nettype','o-contacts']
+    .forEach(id=>document.getElementById(id).textContent='—');
+}
+async function traceOsint(ip){
+  setOsintSt('RESOLVING WHOIS / ASN / RDNS...','');
+  try{
+    const r=await fetch('/api/osint?ip='+encodeURIComponent(ip));
+    const o=await r.json();
+    if(o.status!=='ok'){setOsintSt('OSINT ERROR: '+(o.message||'failed'),'err');return;}
+    fillOsint(o);
+    setOsintSt(o.rdap_error?('RDNS OK · RDAP: '+o.rdap_error):'OSINT COMPLETE',o.rdap_error?'err':'ok');
+  }catch(e){setOsintSt('OSINT CONNECTION ERROR','err');}
+}
+async function trace(ip){
+  setIPSt('TRACING'+(ip?' : '+ip:' YOUR CONNECTION')+'...','');
+  clearOsint();setOsintSt('','');
+  try{
+    const r=await fetch('/api/lookup?ip='+encodeURIComponent(ip||''));
+    const d=await r.json();
+    if(d.status!=='success'){setIPSt('ERROR: '+(d.message||'failed'),'err');return;}
+    setIPSt('TRACE COMPLETE','ok');plotIP(d);
+    traceOsint(d.query||ip||''); // fire-and-forget, doesn't block the map
+  }catch(e){setIPSt('CONNECTION ERROR','err');}
+}
+document.getElementById('traceBtn').onclick=()=>trace(document.getElementById('ipInput').value.trim());
+document.getElementById('ipInput').onkeydown=e=>{if(e.key==='Enter')document.getElementById('traceBtn').click();};
+document.getElementById('myIpBtn').onclick=()=>trace('');
+
+// ── CAM SCAN ──────────────────────────────────────────────────────────────────
+function setCamSt(msg,type){
+  const e=document.getElementById('cam-status');
+  e.textContent=msg;e.className='';
+  if(type)e.classList.add(type);
+}
+
+// Load country list
+(async()=>{
+  try{
+    const r=await fetch('/api/cam/countries');
+    const d=await r.json();
+    const sel=document.getElementById('countrySelect');
+    sel.innerHTML='<option value="">— SELECT COUNTRY —</option>';
+    d.countries.forEach(c=>{
+      const o=document.createElement('option');
+      o.value=c.code;o.textContent=c.name+' ('+c.count+')';
+      sel.appendChild(o);
+    });
+  }catch(e){
+    document.getElementById('countrySelect').innerHTML='<option value="">— FAILED TO LOAD —</option>';
+  }
+})();
+
+function makeCamCard(cam,markerRef){
+  const card=document.createElement('div');
+  card.className='cam-card';
+  card.innerHTML=
+    '<div class="cam-ip">'+cam.query+'</div>'+
+    '<div class="cam-isp">'+(cam.isp||'—')+'</div>'+
+    '<div class="cam-loc">'+(cam.city||'')+(cam.city?', ':'')+(cam.country||'')+'</div>'+
+    (cam.stream_url?'<a class="cam-link" href="'+cam.stream_url+'" target="_blank">▸ OPEN STREAM</a>':'');
+  card.onclick=function(e){
+    if(e.target.classList.contains('cam-link'))return;
+    document.querySelectorAll('.cam-card').forEach(c=>c.classList.remove('active-card'));
+    card.classList.add('active-card');
+    map.flyTo([cam.lat,cam.lon],8,{duration:1.2});
+    markerRef.openPopup();
+  };
+  return card;
+}
+
+function plotCameras(cams,listEl,boundsArr){
+  cams.forEach(function(cam){
+    if(cam.lat==null||cam.lon==null)return;
+    const m=L.marker([cam.lat,cam.lon],{icon:makeIcon()}).addTo(map);
+    m.bindPopup(
+      '<b>'+cam.query+'</b><br/>'+(cam.isp||'')+'<br/>'+
+      (cam.city||'')+(cam.city?', ':'')+(cam.country||'')+'<br/>'+
+      (cam.stream_url?'<a href="'+cam.stream_url+'" target="_blank">▸ OPEN STREAM</a>':'')
+    );
+    camMarkers.push(m);
+    boundsArr.push([cam.lat,cam.lon]);
+    listEl.appendChild(makeCamCard(cam,m));
+  });
+}
+
+// Single country scan
+document.getElementById('scanBtn').onclick=async function(){
+  const country=document.getElementById('countrySelect').value;
+  const pages=document.getElementById('pageSelect').value;
+  if(!country){setCamSt('SELECT A COUNTRY FIRST','err');return;}
+  clearCamMarkers();
+  const list=document.getElementById('cam-list');
+  list.innerHTML='<div style="color:var(--dim);font-size:11px;padding:10px;letter-spacing:1px;">SCANNING...</div>';
+  setCamSt('SCANNING '+country+' — '+pages+' pages...','');
+  try{
+    const r=await fetch('/api/cam/scan?country='+country+'&pages='+pages);
+    const d=await r.json();
+    if(d.status!=='ok'){setCamSt('ERROR: '+(d.message||'scan failed'),'err');return;}
+    const cams=d.cameras;
+    list.innerHTML='';
+    if(cams.length===0){
+      list.innerHTML='<div style="color:var(--dim);font-size:11px;padding:10px;">No cameras found.</div>';
+      setCamSt('NO CAMERAS FOUND','err');return;
+    }
+    const bounds=[];
+    plotCameras(cams,list,bounds);
+    setCamSt('FOUND '+cams.length+' CAMERAS ('+d.pages_scanned+' pages scanned)','ok');
+    if(bounds.length>1)map.fitBounds(bounds,{padding:[40,40]});
+    else if(bounds.length===1)map.flyTo(bounds[0],6,{duration:1.4});
+  }catch(e){setCamSt('CONNECTION ERROR','err');}
+};
+
+// All countries scan
+document.getElementById('scanAllBtn').onclick=async function(){
+  if(!confirm('This will scan ALL countries and may take several minutes. Continue?'))return;
+  clearCamMarkers();
+  const list=document.getElementById('cam-list');
+  list.innerHTML='';
+  setCamSt('FETCHING COUNTRY LIST...','');
+
+  let countries=[];
+  try{
+    const r=await fetch('/api/cam/countries');
+    const d=await r.json();
+    countries=d.countries;
+  }catch(e){setCamSt('FAILED TO LOAD COUNTRIES','err');return;}
+
+  const pages=document.getElementById('pageSelect').value;
+  let total=0;
+  const bounds=[];
+
+  for(let i=0;i<countries.length;i++){
+    const c=countries[i];
+    setCamSt('SCANNING '+c.name+' ('+( i+1)+'/'+countries.length+') — '+total+' found...','');
+    try{
+      const r=await fetch('/api/cam/scan?country='+c.code+'&pages='+pages);
+      const d=await r.json();
+      if(d.status==='ok'&&d.cameras.length>0){
+        plotCameras(d.cameras,list,bounds);
+        total+=d.cameras.length;
+      }
+    }catch(e){}
+    await new Promise(res=>setTimeout(res,400));
+  }
+
+  setCamSt('GLOBAL SCAN DONE — '+total+' CAMERAS / '+countries.length+' COUNTRIES','ok');
+  if(bounds.length>1)map.fitBounds(bounds,{padding:[40,40]});
+};
+</script>
+</body>
+</html>
